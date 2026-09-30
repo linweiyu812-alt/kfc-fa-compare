@@ -1,6 +1,6 @@
 const $=id=>document.getElementById(id); let posRows=[],dmsRows=[],results=[];
 // 名稱不同時在這裡維護：DMS名稱: POS名稱
-const STORE_NAME_MAP={"中壢領航":"桃園領航"};
+const STORE_NAME_MAP={"中壢領航":"桃園領航","西屯家樂福":"西屯康達盛通"};
 function norm(s){return String(s??'').trim().replace(/\s+/g,'');}
 function excelDate(v){if(v instanceof Date)return v;if(typeof v==='number'){const d=XLSX.SSF.parse_date_code(v);return d?new Date(d.y,d.m-1,d.d):null}const d=new Date(v);return isNaN(d)?null:d}
 function ymd(v){const d=excelDate(v);if(!d)return '';return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`}
