@@ -1,19 +1,21 @@
-# FA POS / DMS 比對工具
+# FA POS / DMS 比對工具 v3
 
-## GitHub Pages 使用
-將 `index.html` 與 `fa-compare.js` 放在同一個 GitHub Pages 資料夾即可。
+GitHub Pages 靜態網頁工具。
 
-## 固定比對規則
-- POS：依「店名 + 日期」彙總 `POS金額`
-- DMS：只納入 `訂單狀態=完成`、`付款方式=Cash`、`third_party` 有值，依「ID(餐廳) + 落單日期」彙總 `total_price`
-- 差異 = POS金額 - DMS金額
-- 差異 < 0：未輸入FA
-- 差異 > 0：多輸入須扣回
-- 差異 = 0：無差異
+## 功能
+- 匯入財務 POS Excel
+- 匯入 DMS 送餐紀錄 Excel
+- 依「餐廳＋日期」彙總比對
+- 差異 = POS - DMS
+  - 負數：未輸入FA
+  - 正數：多輸入須扣回
+  - 0：無差異
+- 餐廳名稱對照管理（保存在瀏覽器 localStorage）
+- 預設名稱對照：
+  - 中壢領航 = 桃園領航
+  - 西屯家樂福 = 西屯康達盛通
+- 匯入後顯示可能的未配對餐廳名稱
+- 匯出財務 Excel
 
-## 餐廳名稱對照
-在 `fa-compare.js` 的 `STORE_NAME_MAP` 維護，例如：
-`"中壢領航":"桃園領航"`
-
-## 隱私
-Excel 由瀏覽器端 JavaScript 處理，不會因本工具自動上傳或寫入 GitHub。
+## 更新 GitHub
+將 `index.html` 與 `fa-compare.js` 上傳並覆蓋 Repository 根目錄中的同名檔案即可。

@@ -1,7 +1,10 @@
 const $=id=>document.getElementById(id); let posRows=[],dmsRows=[],results=[];
-// 名稱不同時在這裡維護：DMS名稱: POS名稱
-const STORE_NAME_MAP={"中壢領航":"桃園領航","西屯家樂福":"西屯康達盛通"};
+const DEFAULT_STORE_NAME_MAP={"中壢領航":"桃園領航","西屯家樂福":"西屯康達盛通"};
+const MAP_KEY="kfc_fa_store_name_map_v1";
 function norm(s){return String(s??'').trim().replace(/\s+/g,'');}
+function loadMap(){try{return {...DEFAULT_STORE_NAME_MAP,...JSON.parse(localStorage.getItem(MAP_KEY)||'{}')}}catch(e){return {...DEFAULT_STORE_NAME_MAP}}}
+let STORE_NAME_MAP=loadMap();
+function saveMap(){localStorage.setItem(MAP_KEY,JSON.stringify(STORE_NAME_MAP))}
 function excelDate(v){if(v instanceof Date)return v;if(typeof v==='number'){const d=XLSX.SSF.parse_date_code(v);return d?new Date(d.y,d.m-1,d.d):null}const d=new Date(v);return isNaN(d)?null:d}
 function ymd(v){const d=excelDate(v);if(!d)return '';return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`}
 function num(v){const n=Number(String(v??0).replace(/,/g,''));return Number.isFinite(n)?n:0}
@@ -11,13 +14,23 @@ function objRows(rows,hi){const h=rows[hi].map(norm);return rows.slice(hi+1).map
 function add(map,key,val){map.set(key,(map.get(key)||0)+val)}
 function processPOS(rows){const hi=findHeader(rows,['店名','日期','POS金額']);if(hi<0)throw Error('POS 檔找不到「店名、日期、POS金額」欄位');const map=new Map();for(const r of objRows(rows,hi)){const store=norm(r['店名']),date=ymd(r['日期']);if(store&&date)add(map,store+'|'+date,num(r['POS金額']))}return map}
 function processDMS(rows){const hi=findHeader(rows,['ID','訂單狀態','落單時間','付款方式','third_party','total_price']);if(hi<0)throw Error('DMS 檔缺少必要欄位');const map=new Map();for(const r of objRows(rows,hi)){if(norm(r['訂單狀態'])!=='完成'||norm(r['付款方式']).toLowerCase()!=='cash'||!norm(r['third_party']))continue;let store=norm(r['ID']);store=STORE_NAME_MAP[store]||store;const date=ymd(r['落單時間']);if(store&&date)add(map,store+'|'+date,num(r['total_price']))}return map}
-function compare(){const p=processPOS(posRows),d=processDMS(dmsRows),keys=new Set([...p.keys(),...d.keys()]);results=[...keys].map(k=>{const [store,date]=k.split('|'),pos=p.get(k)||0,dms=d.get(k)||0,diff=pos-dms;return {store,date,pos,dms,diff,remark:diff<0?'未輸入FA':diff>0?'多輸入須扣回':'無差異'}}).sort((a,b)=>a.diff-b.diff||a.store.localeCompare(b.store,'zh-Hant'));render()}
+function storeSets(){const p=processPOS(posRows),d=processDMS(dmsRows);return {p:new Set([...p.keys()].map(k=>k.split('|')[0])),d:new Set([...d.keys()].map(k=>k.split('|')[0]))}}
+function compare(){const p=processPOS(posRows),d=processDMS(dmsRows),keys=new Set([...p.keys(),...d.keys()]);results=[...keys].map(k=>{const [store,date]=k.split('|'),pos=p.get(k)||0,dms=d.get(k)||0,diff=pos-dms;return {store,date,pos,dms,diff,remark:diff<0?'未輸入FA':diff>0?'多輸入須扣回':'無差異'}}).sort((a,b)=>a.diff-b.diff||a.store.localeCompare(b.store,'zh-Hant'));render();renderUnmatched()}
 function render(){const diff=results.filter(x=>x.diff!==0);$('diffCount').textContent=diff.length;$('missingCount').textContent=results.filter(x=>x.diff<0).length;$('overCount').textContent=results.filter(x=>x.diff>0).length;$('result').hidden=false;renderTable()}
 function selected(){const f=$('filter').value;return results.filter(x=>f==='all'||(f==='diff'&&x.diff!==0)||(f==='missing'&&x.diff<0)||(f==='over'&&x.diff>0))}
 function esc(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
 function renderTable(){const fmt=n=>Number(n).toLocaleString('zh-TW');$('tbody').innerHTML=selected().map(x=>`<tr><td>${esc(x.store)}</td><td>${x.date}</td><td class="num">${fmt(x.pos)}</td><td class="num">${fmt(x.dms)}</td><td class="num ${x.diff<0?'neg':x.diff>0?'pos':'ok'}">${fmt(x.diff)}</td><td>${x.remark}</td></tr>`).join('')}
+function renderUnmatched(){if(!posRows.length||!dmsRows.length)return;const {p,d}=storeSets(),rows=[];[...p].filter(x=>!d.has(x)).sort().forEach(x=>rows.push(['POS',x]));[...d].filter(x=>!p.has(x)).sort().forEach(x=>rows.push(['DMS',x]));$('unmatchedCard').hidden=!rows.length;$('unmatchedBody').innerHTML=rows.map(([src,name])=>`<tr class="warn"><td>${src}</td><td>${esc(name)}</td><td>確認是否為名稱不一致</td></tr>`).join('')}
 function exportExcel(){const rows=selected().map(x=>({'餐廳名稱':x.store,'日期':x.date,'POS金額':x.pos,'DMS金額':x.dms,'差異':x.diff,'備註':x.remark}));const ws=XLSX.utils.json_to_sheet(rows);ws['!cols']=[{wch:18},{wch:13},{wch:12},{wch:12},{wch:12},{wch:18}];const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'FA比對結果');const now=new Date(),stamp=`${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}`;XLSX.writeFile(wb,`FA_POS_DMS比對_${stamp}.xlsx`)}
+function renderMap(){const entries=Object.entries(STORE_NAME_MAP).sort((a,b)=>a[0].localeCompare(b[0],'zh-Hant'));$('mapBody').innerHTML=entries.map(([d,p])=>`<tr><td>${esc(d)}</td><td>${esc(p)}</td><td><button class="secondary small" onclick="editMap('${encodeURIComponent(d)}')">編輯</button> <button class="danger small" onclick="deleteMap('${encodeURIComponent(d)}')">刪除</button></td></tr>`).join('')}
+window.editMap=k=>{const old=decodeURIComponent(k),val=STORE_NAME_MAP[old];$('dmsName').value=old;$('posName').value=val;delete STORE_NAME_MAP[old];saveMap();renderMap();$('mapMsg').textContent='請修改後按「新增名稱對照」儲存。'}
+window.deleteMap=k=>{delete STORE_NAME_MAP[decodeURIComponent(k)];saveMap();renderMap();$('mapMsg').textContent='已刪除名稱對照。'}
+$('addMapBtn').onclick=()=>{const d=norm($('dmsName').value),p=norm($('posName').value);if(!d||!p){$('mapMsg').innerHTML='<span class="error">請同時輸入 DMS 與 POS 餐廳名稱</span>';return}STORE_NAME_MAP[d]=p;saveMap();renderMap();$('dmsName').value='';$('posName').value='';$('mapMsg').textContent=`已儲存：${d} ＝ ${p}`;}
+$('resetMapBtn').onclick=()=>{STORE_NAME_MAP={...DEFAULT_STORE_NAME_MAP};saveMap();renderMap();$('mapMsg').textContent='已恢復預設名稱對照。'}
+document.querySelectorAll('.tab').forEach(btn=>btn.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));btn.classList.add('active');document.querySelectorAll('.page').forEach(x=>x.hidden=true);$(btn.dataset.page).hidden=false;});
 $('posFile').onchange=async e=>{try{posRows=await readFile(e.target.files[0]);$('posStatus').textContent=`已匯入：${e.target.files[0].name}`}catch(err){$('posStatus').textContent='讀取失敗：'+err.message}};
 $('dmsFile').onchange=async e=>{try{dmsRows=await readFile(e.target.files[0]);$('dmsStatus').textContent=`已匯入：${e.target.files[0].name}`}catch(err){$('dmsStatus').textContent='讀取失敗：'+err.message}};
 $('compareBtn').onclick=()=>{try{if(!posRows.length||!dmsRows.length)throw Error('請先匯入 POS 與 DMS 兩份 Excel');compare();$('msg').textContent='比對完成'}catch(err){$('msg').innerHTML=`<span class="error">${esc(err.message)}</span>`}};
-$('filter').onchange=renderTable;$('exportBtn').onclick=exportExcel;$('resetBtn').onclick=()=>location.reload();
+$('filter').onchange=renderTable;$('exportBtn').onclick=exportExcel;
+$('resetBtn').onclick=()=>{posRows=[];dmsRows=[];results=[];$('posFile').value='';$('dmsFile').value='';$('posStatus').textContent='尚未匯入';$('dmsStatus').textContent='尚未匯入';$('result').hidden=true;$('unmatchedCard').hidden=true;$('msg').textContent='已清除匯入資料';};
+renderMap();
