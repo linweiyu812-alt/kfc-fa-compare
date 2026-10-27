@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>FA POS / DMS 比對工具</title>
+<title>FA POS / 新版 DMS 比對工具</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 :root{font-family:Arial,"Microsoft JhengHei",sans-serif;color:#222;background:#f5f6f8}*{box-sizing:border-box}body{margin:0}.wrap{max-width:1250px;margin:32px auto;padding:0 20px}.card{background:white;border:1px solid #ddd;border-radius:12px;padding:22px;margin-bottom:18px}h1{margin:0 0 6px;font-size:26px}h2{margin:0 0 8px;font-size:20px}p{color:#666}.uploads{display:grid;grid-template-columns:1fr 1fr;gap:14px}.upload{border:1px dashed #999;border-radius:10px;padding:18px}.upload b{display:block;margin-bottom:10px}input[type=file]{width:100%}input[type=text]{padding:9px;border:1px solid #bbb;border-radius:6px;width:220px}button{border:0;border-radius:7px;padding:10px 16px;font-weight:700;cursor:pointer}.primary{background:#111;color:white}.secondary{background:#e9ecef}.danger{background:#fff0f0;color:#b42318}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}.status{font-size:14px;margin-top:8px;color:#555}.summary{display:flex;gap:20px;flex-wrap:wrap}.metric{min-width:160px}.metric strong{font-size:24px;display:block}.filters,.map-form{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}select{padding:8px;border:1px solid #bbb;border-radius:6px}table{width:100%;border-collapse:collapse;font-size:14px}th,td{border:1px solid #ccc;padding:8px}th{background:#e7eef4;text-align:center}td.num{text-align:right}.neg{color:#b42318}.pos{color:#b54708}.ok{color:#18794e}.warn{background:#fff8e6;color:#8a5a00}.hint{font-size:13px;color:#777}.error{color:#b42318;font-weight:700}.tabs{display:flex;gap:8px;margin-bottom:18px}.tab{background:#e9ecef}.tab.active{background:#111;color:white}.page[hidden]{display:none}.small{padding:6px 10px;font-size:12px}@media(max-width:720px){.uploads{grid-template-columns:1fr}.wrap{padding:0 10px}input[type=text]{width:100%}}
@@ -11,8 +11,8 @@
 <div class="tabs"><button class="tab active" data-page="comparePage">FA 比對</button><button class="tab" data-page="mapPage">餐廳名稱對照</button></div>
 
 <section id="comparePage" class="page">
-<div class="card"><h1>FA POS / DMS 比對工具</h1><p>匯入財務 POS 與 DMS 送餐紀錄，自動依「餐廳＋日期」彙總並產出財務 Excel。檔案只在目前瀏覽器中處理，不會儲存到 GitHub。</p>
-<div class="uploads"><div class="upload"><b>① 財務 POS Excel</b><input id="posFile" type="file" accept=".xlsx,.xls"><div id="posStatus" class="status">尚未匯入</div></div><div class="upload"><b>② DMS 送餐紀錄 Excel</b><input id="dmsFile" type="file" accept=".xlsx,.xls"><div id="dmsStatus" class="status">尚未匯入</div></div></div>
+<div class="card"><h1>FA POS / 新版 DMS 比對工具</h1><p>匯入財務 POS 與新版 DMS ByOrder 訂單明細，自動依「餐廳＋日期」彙總並產出財務 Excel。DMS 僅計入「已送達＋現金＋第三方」訂單，使用結算金額；請確認 POS 核對範圍一致。檔案只在目前瀏覽器中處理，不會儲存到 GitHub。</p>
+<div class="uploads"><div class="upload"><b>① 財務 POS Excel</b><input id="posFile" type="file" accept=".xlsx,.xls"><div id="posStatus" class="status">尚未匯入</div></div><div class="upload"><b>② 新版 DMS ByOrder Excel</b><input id="dmsFile" type="file" accept=".xlsx,.xls"><div id="dmsStatus" class="status">尚未匯入</div></div></div>
 <div class="actions"><button id="compareBtn" class="primary">開始比對</button><button id="resetBtn" class="secondary">清除匯入資料</button></div><div id="msg" class="status"></div></div>
 
 <div id="unmatchedCard" class="card" hidden><h2>⚠️ 可能為餐廳名稱不一致</h2><p>下列名稱只出現在其中一份檔案。若其實是同一家餐廳，請到「餐廳名稱對照」新增對照後，再按一次開始比對。</p>

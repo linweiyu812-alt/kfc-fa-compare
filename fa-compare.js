@@ -5,7 +5,7 @@ function norm(s){return String(s??'').trim().replace(/\s+/g,'');}
 function loadMap(){try{return {...DEFAULT_STORE_NAME_MAP,...JSON.parse(localStorage.getItem(MAP_KEY)||'{}')}}catch(e){return {...DEFAULT_STORE_NAME_MAP}}}
 let STORE_NAME_MAP=loadMap();
 function saveMap(){localStorage.setItem(MAP_KEY,JSON.stringify(STORE_NAME_MAP))}
-function excelDate(v){if(v instanceof Date)return v;if(typeof v==='number'){const d=XLSX.SSF.parse_date_code(v);return d?new Date(d.y,d.m-1,d.d):null}const d=new Date(v);return isNaN(d)?null:d}
+function excelDate(v){if(v instanceof Date)return v;if(typeof v==='number'){const d=XLSX.SSF.parse_date_code(v);return d?new Date(d.y,d.m-1,d.d):null}const d=typeof v==='string'&&/^\d{4}-\d{2}-\d{2}/.test(v)?new Date(v.replace(' ','T')):new Date(v);return isNaN(d)?null:d}
 function ymd(v){const d=excelDate(v);if(!d)return '';return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`}
 function num(v){const n=Number(String(v??0).replace(/,/g,''));return Number.isFinite(n)?n:0}
 async function readFile(file){const ab=await file.arrayBuffer();const wb=XLSX.read(ab,{type:'array',cellDates:true});const ws=wb.Sheets[wb.SheetNames[0]];return XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:true})}
@@ -13,7 +13,19 @@ function findHeader(rows,required){for(let i=0;i<Math.min(rows.length,20);i++){c
 function objRows(rows,hi){const h=rows[hi].map(norm);return rows.slice(hi+1).map(r=>Object.fromEntries(h.map((k,i)=>[k,r[i]]))).filter(o=>Object.values(o).some(v=>v!==null&&v!==''))}
 function add(map,key,val){map.set(key,(map.get(key)||0)+val)}
 function processPOS(rows){const hi=findHeader(rows,['店名','日期','POS金額']);if(hi<0)throw Error('POS 檔找不到「店名、日期、POS金額」欄位');const map=new Map();for(const r of objRows(rows,hi)){const store=norm(r['店名']),date=ymd(r['日期']);if(store&&date)add(map,store+'|'+date,num(r['POS金額']))}return map}
-function processDMS(rows){const hi=findHeader(rows,['ID','訂單狀態','落單時間','付款方式','third_party','total_price']);if(hi<0)throw Error('DMS 檔缺少必要欄位');const map=new Map();for(const r of objRows(rows,hi)){if(norm(r['訂單狀態'])!=='完成'||norm(r['付款方式']).toLowerCase()!=='cash'||!norm(r['third_party']))continue;let store=norm(r['ID']);store=STORE_NAME_MAP[store]||store;const date=ymd(r['落單時間']);if(store&&date)add(map,store+'|'+date,num(r['total_price']))}return map}
+function processDMS(rows){
+ const hi=findHeader(rows,['ID','訂單','落單時間','付款方式','自動/手動','結算金額']);
+ if(hi<0)throw Error('DMS 檔缺少新版必要欄位：ID、訂單、落單時間、付款方式、自動/手動、結算金額');
+ const map=new Map(), seen=new Set();let eligible=0, duplicates=0;
+ for(const r of objRows(rows,hi)){
+  if(norm(r['訂單'])!=='已送達'||norm(r['付款方式'])!=='現金'||norm(r['自動/手動'])!=='第三方')continue;
+  const order=norm(r['regorderid']);if(order&&seen.has(order)){duplicates++;continue}if(order)seen.add(order);
+  let store=norm(r['ID']);store=STORE_NAME_MAP[store]||store;
+  const date=ymd(r['落單時間']);if(store&&date){add(map,store+'|'+date,num(r['結算金額']));eligible++}
+ }
+ $('dmsStatus').textContent=`新版 DMS：符合第三方＋現金＋已送達 ${eligible.toLocaleString()} 筆`+(duplicates?`，排除重複 ${duplicates} 筆`:'');
+ return map;
+}
 function storeSets(){const p=processPOS(posRows),d=processDMS(dmsRows);return {p:new Set([...p.keys()].map(k=>k.split('|')[0])),d:new Set([...d.keys()].map(k=>k.split('|')[0]))}}
 function compare(){const p=processPOS(posRows),d=processDMS(dmsRows),keys=new Set([...p.keys(),...d.keys()]);results=[...keys].map(k=>{const [store,date]=k.split('|'),pos=p.get(k)||0,dms=d.get(k)||0,diff=pos-dms;return {store,date,pos,dms,diff,remark:diff<0?'未輸入FA':diff>0?'多輸入須扣回':'無差異'}}).sort((a,b)=>a.diff-b.diff||a.store.localeCompare(b.store,'zh-Hant'));render();renderUnmatched()}
 function render(){const diff=results.filter(x=>x.diff!==0);$('diffCount').textContent=diff.length;$('missingCount').textContent=results.filter(x=>x.diff<0).length;$('overCount').textContent=results.filter(x=>x.diff>0).length;$('result').hidden=false;renderTable()}
